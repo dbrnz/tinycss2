@@ -10,7 +10,7 @@ from .ast import (AtKeywordToken, Comment, CurlyBracketsBlock, DimensionToken,
                   FunctionBlock, HashToken, IdentToken, LiteralToken,
                   NumberToken, ParenthesesBlock, ParseError, PercentageToken,
                   SquareBracketsBlock, StringToken, UnicodeRangeToken,
-                  URLToken, WhitespaceToken, CustomToken)
+                  URLToken, WhitespaceToken)
 
 _NUMBER_RE = re.compile(r'[-+]?([0-9]*\.)?[0-9]+([eE][+-]?[0-9]+)?')
 _HEX_ESCAPE_RE = re.compile(r'([0-9A-Fa-f]{1,6})[ \n\t]?')
@@ -63,10 +63,6 @@ def parse_component_value_list(css, skip_comments=False):
         elif css.startswith('-->', pos):  # Check before identifiers
             tokens.append(LiteralToken(line, column, '-->'))
             pos += 3
-            continue
-        elif _is_custom_start(css, pos):
-            value, pos = _consume_custom(css, pos)
-            tokens.append(CustomToken(line, column, value))
             continue
         elif _is_ident_start(css, pos):
             value, pos = _consume_ident(css, pos)
@@ -203,6 +199,11 @@ def _is_ident_start(css, pos):
     # https://www.w3.org/TR/css-syntax-3/#would-start-an-identifier
     if _is_name_start(css, pos):
         return True
+    elif css.startswith('--', pos):
+        pos += 2
+        return (
+            # Name-start code point:
+            (pos < len(css) and _is_name_start(css, pos)))
     elif css[pos] == '-':
         pos += 1
         return (
@@ -236,31 +237,6 @@ def _consume_ident(css, pos):
             c, pos = _consume_escape(css, pos + 1)
             chunks.append(c)
             start_pos = pos
-        else:
-            break
-    chunks.append(css[start_pos:pos])
-    return ''.join(chunks), pos
-
-
-def _is_custom_start(css, pos):
-    """Return True if the given position is the start of a CSS custom property."""
-    return css.startswith('--', pos) and _is_name_start(css, pos+2)
-
-
-def _consume_custom(css, pos):
-    """Return (unescaped_value, new_pos).
-
-    Assumes pos starts at a valid custom property. See :func:`_is_custom_start`.
-
-    """
-    chunks = []
-    length = len(css)
-    start_pos = pos
-    while pos < length:
-        c = css[pos]
-        if c in ('abcdefghijklmnopqrstuvwxyz-_0123456789'
-                 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') or ord(c) > 0x7F:
-            pos += 1
         else:
             break
     chunks.append(css[start_pos:pos])
